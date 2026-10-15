@@ -141,7 +141,7 @@
 pip install numpy pillow mediapipe   # + ffmpeg
 curl -L -o models/seg.tflite https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite
 cd pipeline
-python3 audio.py  SOURCE.mp4 ../work
-SEG_MODEL=../models/seg.tflite python3 render.py SOURCE.mp4 ../work
-# mux + loudnorm: see pipeline/master.sh
+python3 audio_engine.py usdt_voucher SOURCE.mp4 ../work
+SEG_MODEL=../models/seg.tflite python3 engine.py usdt_voucher SOURCE.mp4 ../work
+./master.sh ../work ../output/final.mp4
 ```

@@ -265,6 +265,41 @@ def icon(name, size, color=WHITE, color2=None):
         d.ellipse([4 * u, 4 * u, 96 * u, 96 * u], outline=c, width=int(5 * u))
     elif name == "disc":
         d.ellipse([0, 0, S - 1, S - 1], fill=c)
+    elif name == "robot":
+        d.line([(50 * u, 6 * u), (50 * u, 20 * u)], fill=c, width=int(6 * u))
+        d.ellipse([43 * u, 2 * u, 57 * u, 16 * u], fill=c)
+        d.rounded_rectangle([12 * u, 20 * u, 88 * u, 80 * u], 18 * u, fill=c)
+        d.rounded_rectangle([4 * u, 40 * u, 12 * u, 62 * u], 3 * u, fill=c)
+        d.rounded_rectangle([88 * u, 40 * u, 96 * u, 62 * u], 3 * u, fill=c)
+        d.ellipse([28 * u, 38 * u, 42 * u, 52 * u], fill=c2)
+        d.ellipse([58 * u, 38 * u, 72 * u, 52 * u], fill=c2)
+        d.rounded_rectangle([34 * u, 62 * u, 66 * u, 68 * u], 3 * u, fill=c2)
+        d.rounded_rectangle([30 * u, 82 * u, 70 * u, 96 * u], 6 * u, fill=c)
+    elif name == "crown":
+        d.polygon([(8 * u, 34 * u), (30 * u, 56 * u), (50 * u, 18 * u), (70 * u, 56 * u),
+                   (92 * u, 34 * u), (84 * u, 80 * u), (16 * u, 80 * u)], fill=c)
+        d.rounded_rectangle([14 * u, 82 * u, 86 * u, 94 * u], 4 * u, fill=c)
+        for x, y in ((8, 30), (50, 13), (92, 30)):
+            d.ellipse([(x - 7) * u, (y - 7) * u, (x + 7) * u, (y + 7) * u], fill=c)
+    elif name == "cap":  # graduation cap
+        d.polygon([(50 * u, 14 * u), (98 * u, 38 * u), (50 * u, 62 * u), (2 * u, 38 * u)], fill=c)
+        d.rounded_rectangle([24 * u, 46 * u, 76 * u, 80 * u], 10 * u, fill=c)
+        d.line([(86 * u, 42 * u), (86 * u, 76 * u)], fill=c, width=int(5 * u))
+        d.ellipse([80 * u, 72 * u, 92 * u, 86 * u], fill=c)
+    elif name == "chart":
+        d.line([(10 * u, 90 * u), (90 * u, 90 * u)], fill=c, width=int(6 * u))
+        d.line([(10 * u, 10 * u), (10 * u, 90 * u)], fill=c, width=int(6 * u))
+        L([(20, 74), (40, 54), (56, 64), (84, 28)], 8)
+        d.polygon([(70 * u, 22 * u), (90 * u, 18 * u), (88 * u, 38 * u)], fill=c)
+    elif name == "tag":
+        d.polygon([(6 * u, 40 * u), (40 * u, 6 * u), (94 * u, 6 * u), (94 * u, 60 * u),
+                   (60 * u, 94 * u)], fill=c)
+        d.ellipse([70 * u, 18 * u, 84 * u, 32 * u], fill=c2)
+    elif name == "sprout":
+        d.line([(50 * u, 94 * u), (50 * u, 44 * u)], fill=c, width=int(8 * u))
+        d.ellipse([10 * u, 22 * u, 52 * u, 52 * u], fill=c)
+        d.ellipse([48 * u, 8 * u, 92 * u, 42 * u], fill=c)
+        d.rounded_rectangle([26 * u, 84 * u, 74 * u, 96 * u], 6 * u, fill=c)
     else:
         raise KeyError(name)
     return _done(big, size)
@@ -290,6 +325,26 @@ def partial_check(size, p, color=WHITE, width=11):
     for x, y in (path[0], path[-1]):
         r = width / 2
         d.ellipse([(x - r) * u, (y - r) * u, (x + r) * u, (y + r) * u], fill=c)
+    return _done(big, size)
+
+
+@lru_cache(64)
+def padlock(size, open_k=0.0, color=WHITE, color2=INK):
+    """Padlock whose shackle lifts and swings open as open_k goes 0 -> 1."""
+    big = _canvas(size)
+    d = ImageDraw.Draw(big)
+    u = size * SS / 100
+    lift = 14 * min(1, open_k * 2)
+    swing = max(0, open_k * 2 - 1) * 26
+    w = int(9 * u)
+    x0, x1 = 28 - swing * 0.1, 72 + swing
+    d.arc([x0 * u, (6 - lift) * u, x1 * u, (62 - lift) * u], 180, 360, fill=rgba(color), width=w)
+    d.line([(x0 * u + w / 2, (34 - lift) * u), (x0 * u + w / 2, (48 - lift * 0.2) * u)], fill=rgba(color), width=w)
+    if open_k < 0.5:
+        d.line([(x1 * u - w / 2, (34 - lift) * u), (x1 * u - w / 2, 48 * u)], fill=rgba(color), width=w)
+    d.rounded_rectangle([14 * u, 42 * u, 86 * u, 96 * u], 12 * u, fill=rgba(color))
+    d.ellipse([43 * u, 56 * u, 57 * u, 70 * u], fill=rgba(color2))
+    d.rectangle([47 * u, 66 * u, 53 * u, 82 * u], fill=rgba(color2))
     return _done(big, size)
 
 
