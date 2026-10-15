@@ -151,8 +151,7 @@ WORDS_OUT = [
     ("کامیونیتی", 27.80, 28.44, "g"),
     ("فارسی", 28.44, 29.00, "g"),
     ("سایت", 29.00, 29.82, "g"),
-    ("کوین‌پرو", 29.82, 30.41, "g"),
-    ("دات‌کام", 30.41, 31.00, "g"),
+    ("coinepro.com", 29.82, 31.00, "g"),
     ("می‌تونی", 31.00, 31.30, ""),
     ("بری", 31.30, 31.54, ""),
     ("تمام", 31.54, 32.00, ""),
@@ -577,15 +576,20 @@ def scene_trans(t, L):
              ic_col=INK, ic_bg=GOLD)
 
 
-def browser(L, t, cx, cy, k, a, rows_t=None, profit_t=None, tp_t=None):
+def browser(L, t, cx, cy, k, a, rows_t=None, profit_t=None, tp_t=None, url_t=None):
     w, h = 860, 340
     put(L, panel(w, h, 30, WHITE, 250), cx, cy, scale=k, alpha=a)
     top = cy - h / 2 * k
     put(L, panel(w, 64, 30, (232, 236, 242), 255, shadow=False), cx, top + 32 * k, scale=k, alpha=a)
     for j, col in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
         put(L, icon("disc", 18, col), cx + (w / 2 - 34 - j * 28) * k, top + 32 * k, scale=k, alpha=a)
+    if url_t is not None and t >= url_t:  # address bar lights up when the site is named
+        p = prog(t, url_t, 0.6)
+        put(L, panel(540, 52, 26, GOLD, int(255 * (1 - 0.6 * p)), shadow=False), cx - 60 * k, top + 32 * k,
+            scale=k * (1 + 0.06 * (1 - out_cubic(p))), alpha=a)
     put(L, panel(520, 40, 20, WHITE, 255, shadow=False), cx - 60 * k, top + 32 * k, scale=k, alpha=a)
-    put(L, text("کوین‌پرو  •  سیگنال‌ها", "Bold", 26, (90, 96, 110)), cx - 60 * k, top + 34 * k, scale=k, alpha=a)
+    put(L, G.padlock(26, 0.0, GREEN, WHITE), cx - 290 * k, top + 32 * k, scale=k, alpha=a)
+    put(L, text("coinepro.com", "Black", 30, INK), cx - 60 * k, top + 33 * k, scale=k, alpha=a)
     if rows_t is None:
         return
     for j in range(4):
@@ -613,7 +617,7 @@ def scene_site(t, L):
         return
     k = out_back(prog(t, a_["out_in"] + 0.05, 0.4), 1.3)
     e = prog(t, b_["out_out"] - 0.2, 0.2)
-    browser(L, t, W / 2, 335, k, 1 - e, rows_t=31.54, profit_t=33.68, tp_t=34.74)
+    browser(L, t, W / 2, 335, k, 1 - e, rows_t=31.54, profit_t=33.68, tp_t=34.74, url_t=29.82)
 
 
 def scene_ours(t, L):
@@ -799,7 +803,11 @@ def scene_cta(t, L):
             card(L, x, 470, 260, 190, k, 1 - e, border=GLASS, fill=(30, 60, 90), alpha=170)
             put(L, icon("disc", 84, TG_BLUE if ic != "globe" else GOLD), x, 440, scale=k, alpha=1 - e)
             put(L, icon(ic, 50, WHITE, TG_BLUE), x, 440, scale=k, alpha=1 - e)
-            put(L, text(lab, "Black", 44, WHITE), x, 520, scale=k, alpha=1 - e)
+            if ic == "globe":
+                put(L, text(lab, "Black", 40, WHITE), x, 505, scale=k, alpha=1 - e)
+                put(L, text("coinepro.com", "Black", 26, GOLD), x, 545, scale=k, alpha=1 - e)
+            else:
+                put(L, text(lab, "Black", 44, WHITE), x, 520, scale=k, alpha=1 - e)
             if t >= 91.18:
                 kc = out_back(prog(t, 91.18 + (x < W / 2) * 0.1, 0.3), 2.4)
                 put(L, icon("disc", 50, GREEN), x + 100, 390, scale=kc, alpha=1 - e)
@@ -829,19 +837,20 @@ def scene_outro(t, L):
     if lt >= 1.0:
         put(L, icon("arrow_down", 96, GOLD), W / 2, 1040 + 14 * math.sin(lt * 9), scale=out_back(prog(lt, 1.0, 0.3), 2))
     chips = [(1.1, "wallet", "کف ورود ۵۰ تتر  •  عضویت رایگان", GREEN),
-             (1.3, "plane", "سایت، کانال و ربات در دایرکت", PINK),
-             (1.5, "spark", "از ChatGPT بپرس: ربات تریدیار", (120, 220, 190))]
+             (1.25, "globe", "همه‌ی سیگنال‌ها در coinepro.com", GOLD),
+             (1.4, "plane", "سایت، کانال و ربات در دایرکت", PINK),
+             (1.55, "spark", "از ChatGPT بپرس: ربات تریدیار", (120, 220, 190))]
     for j, (td, ic, lab, col) in enumerate(chips):
         if lt < td:
             continue
         k = out_cubic(prog(lt, td, 0.35))
-        y = 1190 + j * 104
+        y = 1180 + j * 96
         put(L, panel(820, 86, 43, INK, 225, border=col, border_a=160), W / 2 + (1 - k) * 120, y, alpha=k)
         put(L, icon(ic, 52, col, INK), W / 2 + 350 + (1 - k) * 120, y, alpha=k)
         put(L, text(lab, "Bold", 38, WHITE), W / 2 + 300 + (1 - k) * 120, y + 2, alpha=k, anchor="r")
     if lt >= 1.8:
         put(L, text("معامله در بازار رمزارز با ریسک همراه است؛ سود گذشته تضمین سود آینده نیست",
-                    "Medium", 28, (200, 200, 206)), W / 2, 1530, alpha=prog(lt, 1.8, 0.3) * 0.9)
+                    "Medium", 28, (200, 200, 206)), W / 2, 1560, alpha=prog(lt, 1.8, 0.3) * 0.9)
 
 
 _backdrops = {}
