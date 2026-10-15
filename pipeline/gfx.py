@@ -295,6 +295,36 @@ def icon(name, size, color=WHITE, color2=None):
         d.polygon([(6 * u, 40 * u), (40 * u, 6 * u), (94 * u, 6 * u), (94 * u, 60 * u),
                    (60 * u, 94 * u)], fill=c)
         d.ellipse([70 * u, 18 * u, 84 * u, 32 * u], fill=c2)
+    elif name == "megaphone":
+        d.polygon([(18 * u, 38 * u), (70 * u, 12 * u), (70 * u, 88 * u), (18 * u, 62 * u)], fill=c)
+        d.rounded_rectangle([6 * u, 36 * u, 24 * u, 64 * u], 4 * u, fill=c)
+        d.polygon([(26 * u, 62 * u), (40 * u, 66 * u), (44 * u, 92 * u), (30 * u, 92 * u)], fill=c)
+        for r in (12, 22):
+            d.arc([(70 + r - 26) * u, (50 - r) * u, (70 + r) * u, (50 + r) * u], -50, 50, fill=c, width=int(5 * u))
+    elif name == "bricks":
+        k = rgba(color2) if color2 else rgba(INK)
+        d.rectangle([0, 10 * u, S - 1, 90 * u], fill=c)
+        for row, y in enumerate((10, 30, 50, 70)):
+            d.line([(0, y * u), (S, y * u)], fill=k, width=int(3 * u))
+            off = 0 if row % 2 == 0 else 16
+            for x in range(off, 100, 32):
+                d.line([(x * u, y * u), (x * u, (y + 20) * u)], fill=k, width=int(3 * u))
+        d.line([(0, 90 * u), (S, 90 * u)], fill=k, width=int(3 * u))
+    elif name == "wallet":
+        d.rounded_rectangle([6 * u, 24 * u, 94 * u, 88 * u], 12 * u, fill=c)
+        d.rounded_rectangle([14 * u, 12 * u, 76 * u, 30 * u], 6 * u, fill=c)
+        d.rounded_rectangle([60 * u, 44 * u, 98 * u, 68 * u], 8 * u, fill=c2)
+        d.ellipse([70 * u, 51 * u, 80 * u, 61 * u], fill=c)
+    elif name == "star":
+        pts = []
+        for j in range(10):
+            r = 48 if j % 2 == 0 else 20
+            a = math.pi / 2 + j * math.pi / 5
+            pts.append(((50 + r * math.cos(a)) * u, (52 - r * math.sin(a)) * u))
+        d.polygon(pts, fill=c)
+    elif name == "spark":  # generic AI-assistant sparkle (4-point star)
+        d.polygon([(50 * u, 2 * u), (60 * u, 40 * u), (98 * u, 50 * u), (60 * u, 60 * u),
+                   (50 * u, 98 * u), (40 * u, 60 * u), (2 * u, 50 * u), (40 * u, 40 * u)], fill=c)
     elif name == "sprout":
         d.line([(50 * u, 94 * u), (50 * u, 44 * u)], fill=c, width=int(8 * u))
         d.ellipse([10 * u, 22 * u, 52 * u, 52 * u], fill=c)

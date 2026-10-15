@@ -32,11 +32,26 @@ def o(src_t, tag=None):
 
 
 # ====================================================================== source
+def probe(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=width,height,r_frame_rate", "-of", "csv=p=0", path],
+                         check=True, capture_output=True, text=True).stdout.strip().split(",")
+    num, den = out[2].split("/")
+    return int(out[0]), int(out[1]), float(num) / float(den)
+
+
 class Source:
+    """Decoded take. Frames are kept at native resolution; everything else
+    (framing, grading output, masks) works in the 720x1280 reference space,
+    so `self.k` = native px per reference px."""
+
     def __init__(self, path):
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "rawvideo",
+        w, h, fps = probe(path)
+        vf = ["-vf", f"fps={FPS}"] if abs(fps - FPS) > 0.01 else []
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, *vf, "-f", "rawvideo",
                               "-pix_fmt", "rgb24", "-"], check=True, capture_output=True).stdout
-        self.frames = np.frombuffer(raw, np.uint8).reshape(-1, tlcore.SRC_H, tlcore.SRC_W, 3)
+        self.frames = np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3)
+        self.k = w / tlcore.SRC_W
         self.n = len(self.frames)
         self._exposure()
         self._drift()
@@ -47,7 +62,9 @@ class Source:
     def _exposure(self):
         # Auto-exposure "breathing": measure the static wall/painting area and
         # pull each frame 75% of the way back to the take's median level.
-        wall = self.frames[:, 0:400:8, ::8].mean((1, 2, 3))
+        r = self._r
+        st = max(1, r(8))
+        wall = self.frames[:, 0:r(400):st, ::st].mean((1, 2, 3))
         k = np.ones(7) / 7
         sm = np.convolve(np.pad(wall, 3, mode="edge"), k, "valid")
         tgt = np.median(sm)
@@ -56,8 +73,11 @@ class Source:
     def _drift(self):
         # Slow tripod drift: phase-correlate the wall region against frame 0,
         # every 6th frame, then interpolate and smooth.
+        r = self._r
+        st = max(1, r(2))
+
         def g(i):
-            return self.frames[i, 40:520:2, ::2].mean(2)
+            return self.frames[i, r(40):r(520):st, ::st].mean(2)
         ref = g(0)
         F0 = np.fft.fft2(ref - ref.mean())
         idx = list(range(0, self.n, 6))
@@ -70,12 +90,15 @@ class Source:
             y, x = np.unravel_index(c.argmax(), c.shape)
             y = y - c.shape[0] if y > c.shape[0] // 2 else y
             x = x - c.shape[1] if x > c.shape[1] // 2 else x
-            dx.append(x * 2.0); dy.append(y * 2.0)
+            dx.append(x * st / self.k); dy.append(y * st / self.k)
         fx = np.interp(np.arange(self.n), idx, dx)
         fy = np.interp(np.arange(self.n), idx, dy)
         k = np.ones(31) / 31
         self.dx = np.convolve(np.pad(fx, 15, mode="edge"), k, "valid")
         self.dy = np.convolve(np.pad(fy, 15, mode="edge"), k, "valid")
+
+    def _r(self, v):
+        return int(round(v * self.k))
 
     def idx(self, src_t):
         return int(min(self.n - 1, max(0, round(src_t * FPS))))
@@ -92,6 +115,9 @@ class Source:
         y = y * (1 + np.array([0.035, 0.008, -0.04]) * hi) + np.array([-0.004, 0.0, 0.010]) * (1 - hi)
         img = Image.fromarray((np.clip(y, 0, 1) * 255 + 0.5).astype(np.uint8))
         img = ImageEnhance.Color(img).enhance(1.10)
+        if self.k != 1:  # low-res take: upscale to the reference space, restore edge contrast
+            img = img.resize((tlcore.SRC_W, tlcore.SRC_H), Image.LANCZOS)
+            img = img.filter(ImageFilter.UnsharpMask(radius=1.6, percent=70, threshold=2))
         if len(self._cache) > 48:
             self._cache.pop(next(iter(self._cache)))
         self._cache[i] = img
@@ -135,27 +161,29 @@ def camera(t):
         z0 = last["framing"][0] * (1 + last["push"] * (T.BODY_DUR - last["out_in"]))
         z = z0 * (1 + 0.025 * lt)
         k = out_cubic(prog(lt, 0.05, 0.55))
-        return src, z, last["framing"][1], 1, 0.55 * k, 16 * k
+        return src, z, last["framing"][1], 1, 0.55 * k, 16 * k, (0.0, 0.0)
     lt = t - s["out_in"]
     zoom, fy = s["framing"]
     z = zoom * (1 + s["push"] * lt)
-    mult, nblur = T.camera_fx(s, lt)
-    return s["src_in"] + lt, z * mult, fy, nblur, 0.0, 0.0
+    fx = T.camera_fx(s, lt)  # (zoom mult, blur samples[, x/y shake in output px])
+    mult, nblur = fx[0], fx[1]
+    off = tuple(fx[2:4]) if len(fx) > 2 else (0.0, 0.0)
+    return s["src_in"] + lt, z * mult, fy, nblur, 0.0, 0.0, off
 
 
-def crop_box(z, fy, i, src):
+def crop_box(z, fy, i, src, off=(0.0, 0.0)):
     z = max(1.0, z)
     s = 1.5 * z
     w, h = tlcore.SRC_W / z, tlcore.SRC_H / z
-    x0 = T.FACE_SRC[0] - 540 / s + src.dx[i]
-    y0 = T.FACE_SRC[1] - fy / s + src.dy[i]
+    x0 = T.FACE_SRC[0] - 540 / s + src.dx[i] - off[0] / s
+    y0 = T.FACE_SRC[1] - fy / s + src.dy[i] - off[1] / s
     x0 = min(max(0, x0), tlcore.SRC_W - w)
     y0 = min(max(0, y0), tlcore.SRC_H - h)
     return (x0, y0, x0 + w, y0 + h)
 
 
 def base_frame(t, src):
-    st, z, fy, nb, dark, br = camera(t)
+    st, z, fy, nb, dark, br, off = camera(t)
     i = src.idx(st)
     img = src.graded(i)
     if nb > 1:  # motion blur across the zoom move within this frame's shutter
@@ -166,23 +194,23 @@ def base_frame(t, src):
             tk = t + (k / (nb - 1) - 0.5) * dt * 0.9
             if sh is not None:  # sub-samples never leave the current shot
                 tk = min(max(tk, sh["out_in"]), sh["out_out"] - 1e-6)
-            _, zk, fyk, *_ = camera(tk)
-            b = img.resize((W, H), Image.BICUBIC, box=crop_box(zk, fyk, i, src))
+            _, zk, fyk, _, _, _, offk = camera(tk)
+            b = img.resize((W, H), Image.BICUBIC, box=crop_box(zk, fyk, i, src, offk))
             a = np.asarray(b, np.float32)
             acc = a if acc is None else acc + a
         frame = Image.fromarray((acc / nb).astype(np.uint8))
     else:
-        frame = img.resize((W, H), Image.BICUBIC, box=crop_box(z, fy, i, src))
+        frame = img.resize((W, H), Image.BICUBIC, box=crop_box(z, fy, i, src, off))
     if br > 0.5:
         frame = frame.filter(ImageFilter.GaussianBlur(br))
     if dark > 0:
         frame = Image.blend(frame, Image.new("RGB", (W, H), INK), dark)
-    return frame, (z, fy, i)
+    return frame, (z, fy, i, off)
 
 
 def person_mask_out(src, cam):
-    z, fy, i = cam
-    return src.person_mask(i).resize((W, H), Image.BILINEAR, box=crop_box(z, fy, i, src))
+    z, fy, i, off = cam
+    return src.person_mask(i).resize((W, H), Image.BILINEAR, box=crop_box(z, fy, i, src, off))
 
 
 # ====================================================================== overlays
@@ -256,6 +284,9 @@ def draw_captions(t, L):
         widths = [sp.width - (0 if a_ else 26) for *_, sp, a_, _ in sprites]
         total = sum(widths) + gap * (len(sprites) - 1)
         x = W / 2 + total / 2  # RTL: start at the right
+        if getattr(T, "CAPTION_PLATE", False):  # busy background (e.g. a lit mic): dark plate
+            put(L, panel(int(total + 110), int(CAP_SIZE * 1.75), 30, INK, 150, shadow=False),
+                W / 2, y + 4, alpha=enter)
         for (w, w0, w1, k, sp, active, spoken), ww in zip(sprites, widths):
             cx = x - ww / 2
             if active:
